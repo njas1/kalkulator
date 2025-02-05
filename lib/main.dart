@@ -1,154 +1,163 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(MyApp());
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ušteda energije',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomePage(),
+      title: "Kalkulator uštede energije",
+      initialRoute: "/",
+      routes: {
+        "/": (context) => const HomePage(),
+        "/result": (context) => const ResultPage(),
+      },
     );
   }
 }
 
 class HomePage extends StatefulWidget {
+  const HomePage({super.key});
+
   @override
   _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  int bulb100W = 0;
-  int bulb60W = 0;
-  int bulb40W = 0;
-
-  void _updateBulbValues(int b100W, int b60W, int b40W) {
-    setState(() {
-      bulb100W = b100W;
-      bulb60W = b60W;
-      bulb40W = b40W;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Izračun uštede energije'),
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          InputBulbs(onBulbValuesChanged: _updateBulbValues),
-          SizedBox(height: 20),
-          ResultDisplay(
-            bulb100W: bulb100W,
-            bulb60W: bulb60W,
-            bulb40W: bulb40W,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class InputBulbs extends StatefulWidget {
-  final Function(int, int, int) onBulbValuesChanged;
-
-  InputBulbs({required this.onBulbValuesChanged});
-
-  @override
-  _InputBulbsState createState() => _InputBulbsState();
-}
-
-class _InputBulbsState extends State<InputBulbs> {
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _controller100W = TextEditingController();
   final TextEditingController _controller60W = TextEditingController();
   final TextEditingController _controller40W = TextEditingController();
 
   void _onSubmit() {
-    final int b100W = int.tryParse(_controller100W.text) ?? 0;
-    final int b60W = int.tryParse(_controller60W.text) ?? 0;
-    final int b40W = int.tryParse(_controller40W.text) ?? 0;
+    if (_formKey.currentState!.validate()) {
+      final int b100W = _parseInput(_controller100W.text);
+      final int b60W = _parseInput(_controller60W.text);
+      final int b40W = _parseInput(_controller40W.text);
 
-    widget.onBulbValuesChanged(b100W, b60W, b40W);
+      final double energySaved = _calculateSavings(b100W, b60W, b40W);
+
+      Navigator.pushNamed(
+        context,
+        "/result",
+        arguments: energySaved,
+      );
+    }
+  }
+
+  int _parseInput(String? value) {
+    if (value == null || value.isEmpty) {
+      return 0;
+    }
+    final int? intValue = int.tryParse(value);
+    return (intValue != null && intValue >= 0) ? intValue : 0;
+  }
+
+  String? _validateInput(String? value) {
+    if (value != null && value.isNotEmpty) {
+      final int? intValue = int.tryParse(value);
+      if (intValue == null || intValue < 0) {
+        return "Unesite ispravan pozitivan broj";
+      }
+    }
+    return null;
+  }
+
+  double _calculateSavings(int b100W, int b60W, int b40W) {
+    final int energyClassic = (b100W * 100) + (b60W * 60) + (b40W * 40);
+    final int energyLed = (b100W * 20) + (b60W * 15) + (b40W * 8);
+    return (energyClassic - energyLed) / 1000;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: <Widget>[
-          TextField(
-            controller: _controller100W,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: 'Broj 100W žarulja'),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Izračun uštede energije'), centerTitle: true),
+      body: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              TextFormField(
+                controller: _controller100W,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Broj 100W žarulja',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lightbulb_outline),
+                ),
+                validator: _validateInput,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _controller60W,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Broj 60W žarulja',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lightbulb_outline),
+                ),
+                validator: _validateInput,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _controller40W,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Broj 40W žarulja',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.lightbulb_outline),
+                ),
+                validator: _validateInput,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _onSubmit,
+                child: const Text('Izračunaj'),
+              ),
+            ],
           ),
-          TextField(
-            controller: _controller60W,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: 'Broj 60W žarulja'),
-          ),
-          TextField(
-            controller: _controller40W,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(labelText: 'Broj 40W žarulja'),
-          ),
-          SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _onSubmit,
-            child: Text('Izračunaj'),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class ResultDisplay extends StatelessWidget {
-  final int bulb100W;
-  final int bulb60W;
-  final int bulb40W;
-
-  ResultDisplay({
-    required this.bulb100W,
-    required this.bulb60W,
-    required this.bulb40W,
-  });
-
-  double _calculateEnergySavedPerDay() {
-    final int energyClassic100W = bulb100W * 100;
-    final int energyClassic60W = bulb60W * 60;
-    final int energyClassic40W = bulb40W * 40;
-
-    final int energyLed100W = bulb100W * 20;
-    final int energyLed60W = bulb60W * 15;
-    final int energyLed40W = bulb40W * 8;
-
-    final int energyClassicTotal = energyClassic100W + energyClassic60W + energyClassic40W;
-    final int energyLedTotal = energyLed100W + energyLed60W + energyLed40W;
-
-    return (energyClassicTotal - energyLedTotal) / 1000; // u kWh
-  }
+class ResultPage extends StatelessWidget {
+  const ResultPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final double energySaved = _calculateEnergySavedPerDay();
-    return Column(
-      children: <Widget>[
-        Text('Ušteda energije dnevno:'),
-        SizedBox(height: 10),
-        Text(
-          '${energySaved.toStringAsFixed(2)} kWh',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+    final double energySaved = ModalRoute.of(context)!.settings.arguments as double;
+    return Scaffold(
+      appBar: AppBar(title: const Text("Rezultat uštede"), centerTitle: true),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            const Text(
+              'Ušteda energije:',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '${energySaved.toStringAsFixed(2)} kWh',
+              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Natrag'),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

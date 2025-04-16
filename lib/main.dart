@@ -29,97 +29,69 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _controller100W = TextEditingController();
-  final TextEditingController _controller60W = TextEditingController();
-  final TextEditingController _controller40W = TextEditingController();
+  final _controllers = List.generate(3, (_) => TextEditingController());
 
-  void _onSubmit() {
-    if (_formKey.currentState!.validate()) {
-      final int b100W = _parseInput(_controller100W.text);
-      final int b60W = _parseInput(_controller60W.text);
-      final int b40W = _parseInput(_controller40W.text);
-
-      final double energySaved = _calculateSavings(b100W, b60W, b40W);
-
-      Navigator.pushNamed(
-        context,
-        "/result",
-        arguments: energySaved,
-      );
-    }
-  }
-
-  int _parseInput(String? value) {
-    if (value == null || value.isEmpty) {
-      return 0;
-    }
-    final int? intValue = int.tryParse(value);
-    return (intValue != null && intValue >= 0) ? intValue : 0;
-  }
-
-  String? _validateInput(String? value) {
+  String? _validateInput(int index, String? value) {
     if (value != null && value.isNotEmpty) {
       final int? intValue = int.tryParse(value);
       if (intValue == null || intValue < 0) {
-        return "Unesite ispravan pozitivan broj";
+        return "Unesite pozitivan broj";
       }
+      return null;
+    } else {
+      if (_controllers.every((controller) => controller.text.isEmpty)) {
+        return "Molimo unesite broj";
+      }
+      return null;
     }
-    return null;
   }
 
-  double _calculateSavings(int b100W, int b60W, int b40W) {
-    final int energyClassic = (b100W * 100) + (b60W * 60) + (b40W * 40);
-    final int energyLed = (b100W * 20) + (b60W * 15) + (b40W * 8);
+  void _onSubmit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final values = _controllers
+        .map((controller) => int.tryParse(controller.text) ?? 0)
+        .toList();
+
+    final energySaved = _calculateSavings(values);
+    Navigator.pushNamed(context, "/result", arguments: energySaved);
+  }
+
+  double _calculateSavings(List<int> values) {
+    int energyClassic = values[0] * 100 + values[1] * 60 + values[2] * 40;
+    int energyLed = values[0] * 20 + values[1] * 15 + values[2] * 8;
     return (energyClassic - energyLed) / 1000;
   }
 
   @override
   Widget build(BuildContext context) {
+    final wattValues = [100, 60, 40];
     return Scaffold(
-      appBar: AppBar(title: const Text('Izračun uštede energije'), centerTitle: true),
+      appBar: AppBar(
+          title: const Text("Izračun uštede energije"), centerTitle: true),
       body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20.0),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              TextFormField(
-                controller: _controller100W,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Broj 100W žarulja',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lightbulb_outline),
+            children: [
+              for (var i = 0; i < 3; i++) ...[
+                TextFormField(
+                  controller: _controllers[i],
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Broj ${wattValues[i]}W žarulja',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.lightbulb_outline),
+                  ),
+                  validator: (value) => _validateInput(i, value),
                 ),
-                validator: _validateInput,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _controller60W,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Broj 60W žarulja',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lightbulb_outline),
-                ),
-                validator: _validateInput,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _controller40W,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Broj 40W žarulja',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lightbulb_outline),
-                ),
-                validator: _validateInput,
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 16),
+              ],
               ElevatedButton(
                 onPressed: _onSubmit,
-                child: const Text('Izračunaj'),
+                child: const Text("Izračunaj"),
               ),
             ],
           ),
@@ -134,26 +106,30 @@ class ResultPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double energySaved = ModalRoute.of(context)!.settings.arguments as double;
+    final energySaved = ModalRoute.of(context)!.settings.arguments as double;
     return Scaffold(
       appBar: AppBar(title: const Text("Rezultat uštede"), centerTitle: true),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'Ušteda energije:',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.green),
-            ),
+          children: [
+            const Text("Ušteda energije:",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                )),
             const SizedBox(height: 10),
-            Text(
-              '${energySaved.toStringAsFixed(2)} kWh',
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold, color: Colors.green.shade800),
-            ),
+            Text("${energySaved.toStringAsFixed(2)} kWh",
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green.shade800,
+                )),
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Natrag'),
+              child: const Text("Natrag"),
             ),
           ],
         ),

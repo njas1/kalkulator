@@ -1,7 +1,77 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:path/path.dart' as p;
 
 void main() {
+  if (!kIsWeb) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
   runApp(const MyApp());
+}
+
+class EnergyCalculation {
+  final int? id;
+  final DateTime date;
+  final double savings;
+
+  EnergyCalculation({this.id, required this.date, required this.savings});
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'date': date.millisecondsSinceEpoch,
+        'savings': savings,
+      };
+
+  factory EnergyCalculation.fromMap(Map<String, dynamic> map) =>
+      EnergyCalculation(
+        id: map['id'],
+        date: DateTime.fromMillisecondsSinceEpoch(map['date']),
+        savings: map['savings'],
+      );
+}
+
+class DatabaseHelper {
+  static final DatabaseHelper instance = DatabaseHelper._init();
+  static Database? _database;
+
+  DatabaseHelper._init();
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    final dbPath = await getDatabasesPath();
+    final path = p.join(dbPath, 'energy_savings.db');
+    return _database = await openDatabase(
+      path,
+      version: 1,
+      onCreate: (db, version) => db.execute('''
+          CREATE TABLE energy_savings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date INTEGER NOT NULL,
+            savings REAL NOT NULL
+          )
+        '''),
+    );
+  }
+
+  Future<int> insert(EnergyCalculation calc) async {
+    final db = await database;
+    return await db.insert('energy_savings', calc.toMap());
+  }
+
+  Future<List<EnergyCalculation>> getAll() async {
+    final db = await database;
+    final result = await db.query('energy_savings', orderBy: 'date DESC');
+    return result.map((map) => EnergyCalculation.fromMap(map)).toList();
+  }
+
+  Future<int> delete(int id) async {
+    final db = await database;
+    return await db.delete('energy_savings', where: 'id = ?', whereArgs: [id]);
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -101,17 +171,48 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class ResultPage extends StatelessWidget {
+class ResultPage extends StatefulWidget {
   const ResultPage({super.key});
+
+  @override
+  State<ResultPage> createState() => _ResultPageState();
+}
+
+class _ResultPageState extends State<ResultPage> {
+  final db = DatabaseHelper.instance;
+  List<EnergyCalculation> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    final data = await db.getAll();
+    setState(() {
+      _history = data;
+    });
+  }
+
+  Future<void> _saveCalculation(double savings) async {
+    await db.insert(EnergyCalculation(date: DateTime.now(), savings: savings));
+    await _loadHistory();
+  }
+
+  Future<void> _deleteCalculation(int id) async {
+    await db.delete(id);
+    await _loadHistory();
+  }
 
   @override
   Widget build(BuildContext context) {
     final energySaved = ModalRoute.of(context)!.settings.arguments as double;
     return Scaffold(
       appBar: AppBar(title: const Text("Rezultat uštede"), centerTitle: true),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text("Ušteda energije:",
                 style: TextStyle(
@@ -126,11 +227,26 @@ class ResultPage extends StatelessWidget {
                   fontWeight: FontWeight.bold,
                   color: Colors.green.shade800,
                 )),
-            const SizedBox(height: 20),
+            const SizedBox(height: 10),
             ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Natrag"),
-            ),
+                onPressed: () => _saveCalculation(energySaved),
+                child: const Text("Spremi")),
+            const Divider(height: 30),
+            const Text("Povijest ušteda:",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Expanded(
+              child: ListView.builder(
+                itemCount: _history.length,
+                itemBuilder: (ctx, i) => ListTile(
+                  title: Text("${_history[i].savings.toStringAsFixed(2)} kWh"),
+                  subtitle: Text(DateFormat.yMMMd().format(_history[i].date)),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteCalculation(_history[i].id!),
+                  ),
+                ),
+              ),
+            )
           ],
         ),
       ),

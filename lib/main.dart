@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 import 'package:path/path.dart' as p;
 
 void main() {
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    databaseFactory = databaseFactoryFfiWeb;
+  } else {
     sqfliteFfiInit();
     databaseFactory = databaseFactoryFfi;
   }
@@ -42,18 +45,24 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) return _database!;
+    _database = await _initDB('energy_savings.db');
+    return _database!;
+  }
+
+  Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'energy_savings.db');
-    return _database = await openDatabase(
+    final path = p.join(dbPath, filePath);
+
+    return await openDatabase(
       path,
       version: 1,
       onCreate: (db, version) => db.execute('''
-          CREATE TABLE energy_savings(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date INTEGER NOT NULL,
-            savings REAL NOT NULL
-          )
-        '''),
+        CREATE TABLE energy_savings(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          date INTEGER NOT NULL,
+          savings REAL NOT NULL
+        )
+      '''),
     );
   }
 
@@ -71,6 +80,11 @@ class DatabaseHelper {
   Future<int> delete(int id) async {
     final db = await database;
     return await db.delete('energy_savings', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future close() async {
+    final db = await database;
+    db.close();
   }
 }
 

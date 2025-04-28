@@ -1,6 +1,6 @@
 {
-    "name": "kalkulator",
-    "short_name": "kalkulator",
+    "name": "tagger",
+    "short_name": "tagger",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
